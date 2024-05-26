@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:drive_beta/widgets/device_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:obd2_plugin/obd2_plugin.dart';
 import 'drive_start_page.dart';
 import 'tutorial.dart';
 import 'login_page.dart';
@@ -13,6 +15,7 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   final FlutterBluePlus flutterBlue = FlutterBluePlus();
   late StreamSubscription<List<ScanResult>> scanSubscription;
+  final Obd2Plugin obd2 = Obd2Plugin();
   List<ScanResult> scanResults = [];
   bool isScanning = false;
   Map<String, String> connectButtonText = {};
@@ -54,11 +57,24 @@ class _MainPageState extends State<MainPage> {
     return Scaffold(
       body: Center(
         child: ElevatedButton(
-          onPressed: () {
-            if (!isScanning) {
-              startScan();
-              showScanResultsDialog(context);
-            }
+          // onPressed: () {
+          //   if (!isScanning) {
+          //     startScan();
+          //     showScanResultsDialog(context);
+          //   }
+          // },
+          onPressed: () async {
+            await showBluetoothDevice(context).then((value) {
+              if (value != null && value) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => DriveStartPage(
+                            obd2: obd2,
+                          )),
+                );
+              }
+            });
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
@@ -97,41 +113,44 @@ class _MainPageState extends State<MainPage> {
 
   void showScanResultsDialog(BuildContext context) {
     showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text(isScanning ? '스캔 진행중...' : '스캔 결과'),
-            content: Container(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: scanResults.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final device = scanResults[index].device;
-                  final deviceId = device.id.toString();
-                  return ListTile(
-                    title: Text(device.name.isEmpty ? 'Unknown Device' : device.name),
-                    subtitle: Text(deviceId),
-                    trailing: ElevatedButton(
-                      onPressed: () => connectToDevice(device),
-                      child: Text(connectButtonText[deviceId] ?? 'Connect'),
-                    ),
-                  );
-                },
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  stopScan();
-                },
-                child: Text('Close'),
-              ),
-            ],
-          );
-        }
-    ).then((_) => stopScan()); // Ensure scan stops when dialog is dismissed in any way
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text(isScanning ? '스캔 진행중...' : '스캔 결과'),
+                content: Container(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: scanResults.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final device = scanResults[index].device;
+                      final deviceId = device.id.toString();
+                      return ListTile(
+                        title: Text(device.name.isEmpty
+                            ? 'Unknown Device'
+                            : device.name),
+                        subtitle: Text(deviceId),
+                        trailing: ElevatedButton(
+                          onPressed: () => connectToDevice(device),
+                          child: Text(connectButtonText[deviceId] ?? 'Connect'),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      stopScan();
+                    },
+                    child: Text('Close'),
+                  ),
+                ],
+              );
+            })
+        .then((_) =>
+            stopScan()); // Ensure scan stops when dialog is dismissed in any way
   }
 
   void connectToDevice(BluetoothDevice device) async {
@@ -144,7 +163,7 @@ class _MainPageState extends State<MainPage> {
       print('Connected to ${device.name}');
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => DriveStartPage(device: device)),
+        MaterialPageRoute(builder: (context) => DriveStartPage(obd2: obd2,)),
       );
     } catch (e) {
       setState(() {
